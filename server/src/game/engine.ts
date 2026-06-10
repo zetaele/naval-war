@@ -113,7 +113,7 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
 
   // Send updated board state to both players
   sendGameState(room, room.hostId);
-  sendGameState(room, room.guestId);
+  if (room.guestId) sendGameState(room, room.guestId);
 
   if (allShipsSunk(opponentBoard.ships)) {
     room.state = RoomState.FINISHED;
@@ -153,6 +153,8 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
 function sendGameState(
   room: {
     id: string;
+    hostId: string;
+    guestId: string | null;
     difficulty: import('@naval-war/types').Difficulty;
     state: RoomState;
     boards: Map<string, { ships: import('@naval-war/types').Ship[]; cells: CellState[][]; confirmed: boolean }>;
@@ -166,7 +168,7 @@ function sendGameState(
   const ws = getWsByUserId(userId);
   if (!ws) return;
 
-  const opponentId = getOpponentId(room as Parameters<typeof getOpponentId>[0], userId);
+  const opponentId = getOpponentId(room, userId);
 
   const myBoard = room.boards.get(userId);
   const oppBoard = room.boards.get(opponentId ?? '');

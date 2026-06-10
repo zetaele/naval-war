@@ -151,7 +151,9 @@ export function joinQueue(ws: WebSocket, difficulty: Difficulty): void {
   );
 
   if (matchIdx !== -1) {
-    const [match] = queue.splice(matchIdx, 1);
+    const spliced = queue.splice(matchIdx, 1);
+    const match = spliced[0];
+    if (!match) { enqueue(client.userId, difficulty); send(ws, { type: MessageType.QUEUE_JOINED, payload: { difficulty } }); return; }
     const matchWs = getWsByUserId(match.userId);
     if (!matchWs) {
       // Matched player disconnected; just enqueue current player
