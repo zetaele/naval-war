@@ -6,6 +6,7 @@ import { WebSocketServer } from 'ws';
 import authRouter from './auth/routes';
 import rankingRouter from './ranking/routes';
 import { getDb } from './db/client';
+import { attachWebSocketServer } from './ws/server';
 
 const PORT = Number(process.env['PORT'] ?? 3001);
 const CLIENT_URL = process.env['CLIENT_URL'] ?? 'http://localhost:5173';
@@ -27,22 +28,7 @@ app.use('/api/ranking', rankingRouter);
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-wss.on('connection', (ws, req) => {
-  const ip = req.socket.remoteAddress ?? 'unknown';
-  console.log(`[ws] client connected from ${ip}`);
-
-  ws.on('message', (data) => {
-    console.log(`[ws] message: ${data.toString()}`);
-  });
-
-  ws.on('close', () => {
-    console.log(`[ws] client disconnected`);
-  });
-
-  ws.on('error', (err) => {
-    console.error(`[ws] error:`, err.message);
-  });
-});
+attachWebSocketServer(wss);
 
 server.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
