@@ -8,7 +8,7 @@ import {
   type Difficulty,
   type ServerMessage,
 } from '@naval-war/types';
-import { clients, rooms, codeToRoomId, queue } from './state';
+import { clients, rooms, codeToRoomId, queue, userRooms } from './state';
 import type { Room, PlayerBoard } from './types';
 import { send } from './send';
 
@@ -58,6 +58,7 @@ export function createRoom(ws: WebSocket, difficulty: Difficulty): void {
   rooms.set(roomId, room);
   codeToRoomId.set(code, roomId);
   client.roomId = roomId;
+  userRooms.set(client.userId, roomId);
 
   send(ws, {
     type: MessageType.ROOM_CREATED,
@@ -98,6 +99,8 @@ export function joinRoom(ws: WebSocket, code: string): void {
 
   room.guestId = client.userId;
   client.roomId = roomId;
+  userRooms.set(client.userId, roomId);
+  userRooms.set(room.hostId, roomId);
 
   const boardSize = DIFFICULTY_CONFIGS[room.difficulty].boardSize;
   room.boards.set(client.userId, {
@@ -192,6 +195,8 @@ export function joinQueue(ws: WebSocket, difficulty: Difficulty): void {
     const currentClient = clients.get(ws);
     if (matchClient) matchClient.roomId = roomId;
     if (currentClient) currentClient.roomId = roomId;
+    userRooms.set(match.userId, roomId);
+    userRooms.set(client.userId, roomId);
 
     const matchFoundHost: ServerMessage = {
       type: MessageType.MATCH_FOUND,
@@ -276,4 +281,8 @@ export function cleanupRoom(roomId: string): void {
 
   codeToRoomId.delete(room.code);
   rooms.delete(roomId);
+
+  // Clear userId → roomId mappings so reconnecting after game-over starts fresh
+  if (room.hostId) userRooms.delete(room.hostId);
+  if (room.guestId) userRooms.delete(room.guestId);
 }

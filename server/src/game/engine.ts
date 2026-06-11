@@ -204,6 +204,54 @@ function sendGameState(
   send(ws, { type: MessageType.GAME_STATE_UPDATE, payload: gameState });
 }
 
+/**
+ * Called when a player reconnects (or navigates to a new page that opens a
+ * fresh WS). Sends the appropriate room state so the client can restore its UI.
+ * The `ws` param is the newly opened socket, not yet stored in `clients` when
+ * this runs — so we pass it explicitly instead of looking it up.
+ */
+export function resendStateToPlayer(userId: string, ws: import('ws').WebSocket): void {
+  // Find the room this player is in
+  let roomId: string | null = null;
+  for (const client of clients.values()) {
+    if (client.userId === userId) { roomId = client.roomId; break; }
+  }
+  if (!roomId) return;
+
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  if (room.state === RoomState.SETUP) {
+    send(ws, {
+      type: MessageType.BOARD_SETUP_PHASE,
+      payload: { difficulty: room.difficulty, config: DIFFICULTY_CONFIGS[room.difficulty] },
+    });
+  } else if (room.state === RoomState.IN_PROGRESS) {
+    const opponentId = room.hostId === userId ? room.guestId : room.hostId;
+    const myBoard = room.boards.get(userId);
+    const oppBoard = room.boards.get(opponentId ?? '');
+    if (!myBoard) return;
+
+    const size = DIFFICULTY_CONFIGS[room.difficulty].boardSize;
+    const gameState: PlayerGameState = {
+      roomId: room.id,
+      difficulty: room.difficulty,
+      phase: room.state,
+      myBoard: { size, cells: myBoard.cells, ships: myBoard.ships },
+      opponentBoard: {
+        size,
+        cells: oppBoard ? maskBoard(oppBoard.cells) : Array.from({ length: size }, () =>
+          Array<CellState>(size).fill(CellState.EMPTY),
+        ),
+      },
+      myTurn: room.currentTurnUserId === userId,
+      moveCount: room.moveCount,
+      startedAt: room.startedAt?.toISOString() ?? null,
+    };
+    send(ws, { type: MessageType.GAME_STATE_UPDATE, payload: gameState });
+  }
+}
+
 function getOpponentId(
   room: { hostId: string; guestId: string | null },
   userId: string,

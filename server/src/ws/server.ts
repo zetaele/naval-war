@@ -2,11 +2,12 @@ import type { IncomingMessage } from 'http';
 import type WebSocket from 'ws';
 import type { WebSocketServer } from 'ws';
 import { verifyAccessToken } from '../auth/jwt';
-import { clients, rooms, queue } from './state';
+import { clients, rooms, queue, userRooms } from './state';
 import { handleMessage } from './handler';
 import { broadcastToRoom, cleanupRoom, getWsByUserId } from './rooms';
-import { MessageType, RoomState } from '@naval-war/types';
+import { MessageType, RoomState, DIFFICULTY_CONFIGS } from '@naval-war/types';
 import { send } from './send';
+import { resendStateToPlayer } from '../game/engine';
 
 const RECONNECT_TIMEOUT_MS = 30_000;
 
@@ -31,9 +32,11 @@ export function attachWebSocketServer(wss: WebSocketServer): void {
       return;
     }
 
-    // Handle reconnection: if player was in a room, restore their client state
+    // Handle reconnection: if player was in a room, restore their client state.
+    // userRooms persists the userId→roomId mapping even after the old WS closes,
+    // so page navigation (which reopens a fresh WS) restores the room correctly.
     const existingEntry = findExistingClient(payload.sub);
-    const roomId = existingEntry?.roomId ?? null;
+    const roomId = userRooms.get(payload.sub) ?? existingEntry?.roomId ?? null;
 
     if (existingEntry) {
       // Kill old dead socket entry
@@ -62,6 +65,10 @@ export function attachWebSocketServer(wss: WebSocketServer): void {
             payload: { userId: payload.sub, username: payload.username },
           });
         }
+
+        // Always resend current room state so the client can restore its UI
+        // (happens on every navigate, since each page opens a fresh WS connection)
+        resendStateToPlayer(payload.sub, ws);
       }
     }
 

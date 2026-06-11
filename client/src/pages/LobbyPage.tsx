@@ -31,7 +31,7 @@ export function LobbyPage() {
   useEffect(() => {
     const phase = state.phase;
     if (phase.name === 'setup' || phase.name === 'in_game') {
-      navigate(`/game/${phase.roomId}`, { state: { send } });
+      navigate(`/game/${phase.roomId}`);
     }
   }, [state.phase, navigate, send]);
 
