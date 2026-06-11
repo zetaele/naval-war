@@ -21,7 +21,6 @@ export function GamePage() {
   const { send, connected } = useWebSocket({
     token: accessToken,
     onMessage: handleServerMessage,
-    onDisconnected: () => dispatch({ type: 'ERROR', message: 'Connection lost. Attempting to reconnect…' }),
   });
 
   useEffect(() => {
@@ -214,8 +213,15 @@ function TopBar({ connected, username }: { connected: boolean; username: string 
   return (
     <header className="border-b border-ocean-800 px-4 py-2 flex items-center justify-between">
       <span className="text-sm font-bold text-white">Naval War</span>
-      <span className="text-ocean-300 text-xs">
-        {connected ? '🟢' : '🔴'} {username}
+      <span className="text-xs flex items-center gap-1.5">
+        {connected ? (
+          <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+        ) : (
+          <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block" />
+        )}
+        <span className={connected ? 'text-ocean-300' : 'text-yellow-300'}>
+          {connected ? username : 'Reconnecting…'}
+        </span>
       </span>
     </header>
   );
