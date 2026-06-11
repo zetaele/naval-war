@@ -111,10 +111,6 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
     },
   });
 
-  // Send updated board state to both players
-  sendGameState(room, room.hostId);
-  if (room.guestId) sendGameState(room, room.guestId);
-
   if (allShipsSunk(opponentBoard.ships)) {
     room.state = RoomState.FINISHED;
     const duration = room.startedAt
@@ -124,6 +120,10 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
     const winnerUsername = client.username;
     const loserWs = getWsByUserId(opponentId);
     const loserUsername = loserWs ? (clients.get(loserWs)?.username ?? 'Unknown') : 'Unknown';
+
+    // Send final board state before game-over notification
+    sendGameState(room, room.hostId);
+    if (room.guestId) sendGameState(room, room.guestId);
 
     broadcastToRoom(room, {
       type: MessageType.GAME_OVER,
@@ -142,8 +142,12 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
     return;
   }
 
-  // Advance turn
+  // Advance turn BEFORE sending game state so myTurn flags are correct
   room.currentTurnUserId = opponentId;
+
+  sendGameState(room, room.hostId);
+  if (room.guestId) sendGameState(room, room.guestId);
+
   broadcastToRoom(room, {
     type: MessageType.TURN_CHANGE,
     payload: { currentTurnPlayerId: opponentId },
