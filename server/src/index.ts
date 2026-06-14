@@ -9,14 +9,23 @@ import { initDb } from './db/client';
 import { attachWebSocketServer } from './ws/server';
 
 const PORT = Number(process.env['PORT'] ?? 3001);
-const CLIENT_URL = process.env['CLIENT_URL'] ?? 'http://localhost:5173';
+const ALLOWED_ORIGINS = (process.env['CLIENT_URL'] ?? 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim());
 
 async function main() {
   await initDb();
 
   const app = express();
   app.use(express.json());
-  app.use(cors({ origin: CLIENT_URL, credentials: true }));
+  app.use(cors({
+    origin: (origin, cb) => {
+      // Allow requests with no origin (curl, mobile apps, same-origin)
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: ${origin} not allowed`));
+    },
+    credentials: true,
+  }));
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true, timestamp: new Date().toISOString() });
