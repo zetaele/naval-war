@@ -144,7 +144,7 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
       },
     });
 
-    if (!room.botUserId) persistGame(room, client.userId, opponentId, duration);
+    if (!room.botUserId) void persistGame(room, client.userId, opponentId, duration);
     cleanupRoom(room.id);
     return;
   }
@@ -347,17 +347,18 @@ function getOpponentId(
   return room.hostId === userId ? room.guestId : room.hostId;
 }
 
-function persistGame(
+async function persistGame(
   room: { id: string; hostId: string; guestId: string | null; difficulty: string; moveCount: number; startedAt: Date | null },
   winnerId: string,
   loserId: string,
   duration: number,
-): void {
+): Promise<void> {
   try {
     const db = getDb();
-    db.prepare(
-      'INSERT OR IGNORE INTO games (id, player1_id, player2_id, winner_id, difficulty, moves_count, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    ).run(room.id, room.hostId, room.guestId ?? loserId, winnerId, room.difficulty, room.moveCount, duration);
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO games (id, player1_id, player2_id, winner_id, difficulty, moves_count, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [room.id, room.hostId, room.guestId ?? loserId, winnerId, room.difficulty, room.moveCount, duration],
+    });
   } catch (err) {
     console.error('[game] failed to persist game:', err);
   }

@@ -48,7 +48,8 @@ export function useWebSocket({
     function connect() {
       if (unmountedRef.current) return;
 
-      const WS_URL = `ws://${window.location.hostname}:3001?token=${encodeURIComponent(token!)}`;
+      const WS_BASE = import.meta.env['VITE_WS_URL'] ?? `ws://${window.location.hostname}:3001`;
+      const WS_URL = `${WS_BASE}?token=${encodeURIComponent(token!)}`;
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 

@@ -55,8 +55,8 @@ router.post('/register', async (req, res) => {
   }
 
   const db = getDb();
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
-  if (existing) {
+  const existing = await db.execute({ sql: 'SELECT id FROM users WHERE username = ?', args: [username] });
+  if (existing.rows.length > 0) {
     const response: ApiResponse<never> = { success: false, error: 'Username already taken' };
     res.status(409).json(response);
     return;
@@ -65,15 +65,16 @@ router.post('/register', async (req, res) => {
   const id = uuidv4();
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  db.prepare('INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)').run(id, username, passwordHash);
+  await db.execute({ sql: 'INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)', args: [id, username, passwordHash] });
 
   const accessToken = signAccessToken(id, username);
   const refreshToken = signRefreshToken(id);
   const tokenHash = hashToken(refreshToken);
 
-  db.prepare(
-    'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
-  ).run(uuidv4(), id, tokenHash, refreshTokenExpiresAt());
+  await db.execute({
+    sql: 'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
+    args: [uuidv4(), id, tokenHash, refreshTokenExpiresAt()],
+  });
 
   const response: ApiResponse<AuthResponse> = {
     success: true,
@@ -92,7 +93,8 @@ router.post('/login', async (req, res) => {
   }
 
   const db = getDb();
-  const user = db.prepare('SELECT id, username, password_hash FROM users WHERE username = ?').get(username) as UserRow | undefined;
+  const result = await db.execute({ sql: 'SELECT id, username, password_hash FROM users WHERE username = ?', args: [username] });
+  const user = result.rows[0] as unknown as UserRow | undefined;
 
   if (!user) {
     const response: ApiResponse<never> = { success: false, error: 'Invalid credentials' };
@@ -111,22 +113,19 @@ router.post('/login', async (req, res) => {
   const refreshToken = signRefreshToken(user.id);
   const tokenHash = hashToken(refreshToken);
 
-  db.prepare(
-    'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
-  ).run(uuidv4(), user.id, tokenHash, refreshTokenExpiresAt());
+  await db.execute({
+    sql: 'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
+    args: [uuidv4(), user.id, tokenHash, refreshTokenExpiresAt()],
+  });
 
   const response: ApiResponse<AuthResponse> = {
     success: true,
-    data: {
-      accessToken,
-      refreshToken,
-      user: { id: user.id, username: user.username },
-    },
+    data: { accessToken, refreshToken, user: { id: user.id, username: user.username } },
   };
   res.json(response);
 });
 
-router.post('/refresh', (req, res) => {
+router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body as { refreshToken?: string };
 
   if (!refreshToken) {
@@ -146,9 +145,8 @@ router.post('/refresh', (req, res) => {
 
   const db = getDb();
   const tokenHash = hashToken(refreshToken);
-  const stored = db
-    .prepare('SELECT id, user_id, expires_at FROM refresh_tokens WHERE token_hash = ?')
-    .get(tokenHash) as RefreshTokenRow | undefined;
+  const storedResult = await db.execute({ sql: 'SELECT id, user_id, expires_at FROM refresh_tokens WHERE token_hash = ?', args: [tokenHash] });
+  const stored = storedResult.rows[0] as unknown as RefreshTokenRow | undefined;
 
   if (!stored || new Date(stored.expires_at) < new Date()) {
     const response: ApiResponse<never> = { success: false, error: 'Refresh token revoked or expired' };
@@ -156,7 +154,8 @@ router.post('/refresh', (req, res) => {
     return;
   }
 
-  const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(payload.sub) as { id: string; username: string } | undefined;
+  const userResult = await db.execute({ sql: 'SELECT id, username FROM users WHERE id = ?', args: [payload.sub] });
+  const user = userResult.rows[0] as unknown as { id: string; username: string } | undefined;
   if (!user) {
     const response: ApiResponse<never> = { success: false, error: 'User not found' };
     res.status(401).json(response);
@@ -164,13 +163,14 @@ router.post('/refresh', (req, res) => {
   }
 
   // Rotate: delete old token, issue new pair
-  db.prepare('DELETE FROM refresh_tokens WHERE id = ?').run(stored.id);
+  await db.execute({ sql: 'DELETE FROM refresh_tokens WHERE id = ?', args: [stored.id] });
 
   const newAccessToken = signAccessToken(user.id, user.username);
   const newRefreshToken = signRefreshToken(user.id);
-  db.prepare(
-    'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
-  ).run(uuidv4(), user.id, hashToken(newRefreshToken), refreshTokenExpiresAt());
+  await db.execute({
+    sql: 'INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
+    args: [uuidv4(), user.id, hashToken(newRefreshToken), refreshTokenExpiresAt()],
+  });
 
   const response: ApiResponse<RefreshResponse> = {
     success: true,
@@ -179,11 +179,11 @@ router.post('/refresh', (req, res) => {
   res.json(response);
 });
 
-router.post('/logout', requireAuth, (req: AuthRequest, res) => {
+router.post('/logout', requireAuth, async (req: AuthRequest, res) => {
   const { refreshToken } = req.body as { refreshToken?: string };
   if (refreshToken) {
     const db = getDb();
-    db.prepare('DELETE FROM refresh_tokens WHERE token_hash = ?').run(hashToken(refreshToken));
+    await db.execute({ sql: 'DELETE FROM refresh_tokens WHERE token_hash = ?', args: [hashToken(refreshToken)] });
   }
   res.json({ success: true });
 });

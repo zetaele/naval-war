@@ -14,7 +14,7 @@ export function RankingPage() {
   useEffect(() => {
     if (!user) { navigate('/auth', { replace: true }); return; }
 
-    fetch('/api/ranking', {
+    fetch((import.meta.env['VITE_API_URL'] ?? '') + '/api/ranking', {
       headers: { Authorization: `Bearer ${accessToken ?? ''}` },
     })
       .then((r) => r.json())

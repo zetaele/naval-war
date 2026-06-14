@@ -1,20 +1,17 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { createClient, type Client } from '@libsql/client';
 import { initSchema } from './schema';
 
-let _db: Database.Database | null = null;
+let _client: Client | null = null;
 
-export function getDb(): Database.Database {
-  if (_db) return _db;
+export function getDb(): Client {
+  if (_client) return _client;
+  _client = createClient({
+    url: process.env['TURSO_DATABASE_URL'] ?? 'file:./data/naval-war.db',
+    authToken: process.env['TURSO_AUTH_TOKEN'],
+  });
+  return _client;
+}
 
-  const dbPath = process.env['DB_PATH'] ?? './data/naval-war.db';
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  _db = new Database(dbPath);
-  initSchema(_db);
-  return _db;
+export async function initDb(): Promise<void> {
+  await initSchema(getDb());
 }

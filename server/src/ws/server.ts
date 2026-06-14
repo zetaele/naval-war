@@ -177,17 +177,10 @@ async function persistGame(
     const { getDb } = await import('../db/client');
     const db = getDb();
     const duration = room.startedAt ? Math.floor((Date.now() - room.startedAt.getTime()) / 1000) : 0;
-    db.prepare(
-      'INSERT OR IGNORE INTO games (id, player1_id, player2_id, winner_id, difficulty, moves_count, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    ).run(
-      room.id,
-      room.hostId,
-      room.guestId ?? room.hostId,
-      winnerId,
-      room.difficulty,
-      room.moveCount,
-      duration,
-    );
+    await db.execute({
+      sql: 'INSERT OR IGNORE INTO games (id, player1_id, player2_id, winner_id, difficulty, moves_count, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [room.id, room.hostId, room.guestId ?? room.hostId, winnerId, room.difficulty, room.moveCount, duration],
+    });
   } catch (err) {
     console.error('[ws] failed to persist game:', err);
   }
