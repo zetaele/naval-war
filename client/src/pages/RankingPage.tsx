@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { RankingEntry } from '@naval-war/types';
 import { useAuth } from '../context/AuthContext';
-import { Button } from '../components/ui/Button';
+import { NavBar } from '../components/ui/NavBar';
 
 export function RankingPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,12 +25,7 @@ export function RankingPage() {
 
   return (
     <div className="min-h-screen bg-ocean-950 flex flex-col">
-      <header className="border-b border-ocean-800 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Naval War</h1>
-        <Button variant="ghost" size="sm" onClick={() => navigate('/lobby')}>
-          ← Lobby
-        </Button>
-      </header>
+      <NavBar />
 
       <main className="flex-1 p-4 max-w-2xl mx-auto w-full">
         <h2 className="text-2xl font-bold text-white mb-1">Rankings</h2>

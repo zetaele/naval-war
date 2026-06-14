@@ -6,6 +6,7 @@ import { useGame } from '../context/GameContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { NavBar } from '../components/ui/NavBar';
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   [Difficulty.EASY]: 'Easy (8×8)',
@@ -14,7 +15,7 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 };
 
 export function LobbyPage() {
-  const { user, accessToken, logout } = useAuth();
+  const { user, accessToken } = useAuth();
   const { state, dispatch, handleServerMessage } = useGame();
   const navigate = useNavigate();
 
@@ -46,21 +47,11 @@ export function LobbyPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-ocean-950 to-ocean-900 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-ocean-800 px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Naval War</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-ocean-300 text-sm">
-            {connected ? '🟢' : '🔴'} {user.username}
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/ranking')}>
-            Rankings
-          </Button>
-          <Button variant="ghost" size="sm" onClick={logout}>
-            Logout
-          </Button>
-        </div>
-      </header>
+      <NavBar />
+      {/* Connection status */}
+      <div className="px-4 py-1 text-xs text-ocean-500 border-b border-ocean-800/50">
+        {connected ? '● connected' : '● connecting...'}
+      </div>
 
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
