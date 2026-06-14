@@ -5,18 +5,14 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 
 export function RankingPage() {
-  const { user, accessToken } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user) { navigate('/auth', { replace: true }); return; }
-
-    fetch((import.meta.env['VITE_API_URL'] ?? '') + '/api/ranking', {
-      headers: { Authorization: `Bearer ${accessToken ?? ''}` },
-    })
+    fetch((import.meta.env['VITE_API_URL'] ?? '') + '/api/ranking')
       .then((r) => r.json())
       .then((data: { success: boolean; data?: { rankings: RankingEntry[] }; error?: string }) => {
         if (data.success && data.data) {
@@ -27,7 +23,7 @@ export function RankingPage() {
       })
       .catch(() => setError('Network error'))
       .finally(() => setLoading(false));
-  }, [user, accessToken, navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-ocean-950 flex flex-col">
