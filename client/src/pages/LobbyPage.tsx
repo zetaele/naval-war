@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
-  [Difficulty.EASY]: 'Easy (12×12)',
+  [Difficulty.EASY]: 'Easy (8×8)',
   [Difficulty.MEDIUM]: 'Medium (16×16)',
   [Difficulty.HARD]: 'Hard (20×20)',
 };
@@ -20,7 +20,7 @@ export function LobbyPage() {
 
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.EASY);
   const [joinCode, setJoinCode] = useState('');
-  const [tab, setTab] = useState<'create' | 'join' | 'queue'>('queue');
+  const [tab, setTab] = useState<'solo' | 'queue' | 'create' | 'join'>('solo');
 
   const { send, connected } = useWebSocket({
     token: accessToken,
@@ -102,7 +102,7 @@ export function LobbyPage() {
           {phase.name === 'idle' && (
             <div className="bg-ocean-900 rounded-2xl border border-ocean-700 shadow-2xl shadow-black/50 overflow-hidden">
               <div className="flex border-b border-ocean-700">
-                {(['queue', 'create', 'join'] as const).map((t) => (
+                {(['solo', 'queue', 'create', 'join'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => { setTab(t); dispatch({ type: 'CLEAR_ERROR' }); }}
@@ -110,13 +110,13 @@ export function LobbyPage() {
                       tab === t ? 'bg-ocean-700 text-white' : 'text-ocean-400 hover:text-ocean-200 hover:bg-ocean-800'
                     }`}
                   >
-                    {t === 'queue' ? 'Matchmaking' : t === 'create' ? 'Create Room' : 'Join Room'}
+                    {t === 'solo' ? 'Solo' : t === 'queue' ? 'Matchmaking' : t === 'create' ? 'Create Room' : 'Join Room'}
                   </button>
                 ))}
               </div>
 
               <div className="p-6 flex flex-col gap-4">
-                {/* Difficulty picker (shared by create + queue) */}
+                {/* Difficulty picker (shared by solo, create + queue) */}
                 {tab !== 'join' && (
                   <div>
                     <p className="text-sm font-medium text-ocean-200 mb-2">Difficulty</p>
@@ -166,7 +166,9 @@ export function LobbyPage() {
                 <Button
                   onClick={() => {
                     dispatch({ type: 'CLEAR_ERROR' });
-                    if (tab === 'queue') {
+                    if (tab === 'solo') {
+                      send({ type: MessageType.START_SOLO, payload: { difficulty } });
+                    } else if (tab === 'queue') {
                       send({ type: MessageType.JOIN_QUEUE, payload: { difficulty } });
                     } else if (tab === 'create') {
                       send({ type: MessageType.CREATE_ROOM, payload: { difficulty } });
@@ -177,7 +179,7 @@ export function LobbyPage() {
                   disabled={!connected || (tab === 'join' && joinCode.length !== 6)}
                   size="lg"
                 >
-                  {tab === 'queue' ? 'Find Match' : tab === 'create' ? 'Create Room' : 'Join Room'}
+                  {tab === 'solo' ? 'Play Solo' : tab === 'queue' ? 'Find Match' : tab === 'create' ? 'Create Room' : 'Join Room'}
                 </Button>
               </div>
             </div>

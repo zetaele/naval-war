@@ -11,6 +11,7 @@ import {
 import { clients, rooms, codeToRoomId, queue, userRooms } from './state';
 import type { Room, PlayerBoard } from './types';
 import { send } from './send';
+import { generateBotBoard } from '../game/board';
 
 function generateCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -48,6 +49,7 @@ export function createRoom(ws: WebSocket, difficulty: Difficulty): void {
     state: RoomState.WAITING,
     hostId: client.userId,
     guestId: null,
+    botUserId: null,
     boards: new Map([[client.userId, board]]),
     currentTurnUserId: null,
     moveCount: 0,
@@ -178,6 +180,7 @@ export function joinQueue(ws: WebSocket, difficulty: Difficulty): void {
       state: RoomState.WAITING,
       hostId: match.userId,
       guestId: client.userId,
+      botUserId: null,
       boards: new Map([
         [match.userId, { ships: [], cells: makeEmptyBoard(boardSize), confirmed: false }],
         [client.userId, { ships: [], cells: makeEmptyBoard(boardSize), confirmed: false }],
@@ -268,6 +271,54 @@ function getUsernameById(userId: string): string {
     if (client.userId === userId) return client.username;
   }
   return 'Unknown';
+}
+
+export function startSoloGame(ws: WebSocket, difficulty: Difficulty): void {
+  const client = clients.get(ws);
+  if (!client) return;
+
+  if (client.roomId) {
+    send(ws, { type: MessageType.ROOM_ERROR, payload: { message: 'Already in a room' } });
+    return;
+  }
+
+  const roomId = uuidv4();
+  const botUserId = `bot-${roomId}`;
+  const boardSize = DIFFICULTY_CONFIGS[difficulty].boardSize;
+  const botBoard = generateBotBoard(difficulty);
+
+  const room: Room = {
+    id: roomId,
+    code: '',
+    difficulty,
+    state: RoomState.SETUP,
+    hostId: client.userId,
+    guestId: botUserId,
+    botUserId,
+    boards: new Map([
+      [client.userId, { ships: [], cells: makeEmptyBoard(boardSize), confirmed: false }],
+      [botUserId, { ships: botBoard.ships, cells: botBoard.cells, confirmed: true }],
+    ]),
+    currentTurnUserId: null,
+    moveCount: 0,
+    startedAt: null,
+    disconnectTimers: new Map(),
+  };
+
+  rooms.set(roomId, room);
+  client.roomId = roomId;
+  userRooms.set(client.userId, roomId);
+
+  // Reuse MATCH_FOUND so the client transitions to the setup phase normally
+  send(ws, {
+    type: MessageType.MATCH_FOUND,
+    payload: { roomId, difficulty, opponentUsername: 'Bot' },
+  });
+
+  send(ws, {
+    type: MessageType.BOARD_SETUP_PHASE,
+    payload: { difficulty, config: DIFFICULTY_CONFIGS[difficulty] },
+  });
 }
 
 export function cleanupRoom(roomId: string): void {

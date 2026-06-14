@@ -34,6 +34,9 @@ export enum MessageType {
   ROOM_JOINED = 'ROOM_JOINED',
   ROOM_ERROR = 'ROOM_ERROR',
 
+  // Solo mode
+  START_SOLO = 'START_SOLO',
+
   // Matchmaking
   JOIN_QUEUE = 'JOIN_QUEUE',
   LEAVE_QUEUE = 'LEAVE_QUEUE',
@@ -97,10 +100,9 @@ export interface DifficultyConfig {
 
 export const DIFFICULTY_CONFIGS: Record<Difficulty, DifficultyConfig> = {
   [Difficulty.EASY]: {
-    boardSize: 12,
+    boardSize: 8,
     fleet: [
-      { size: 5, count: 1 },
-      { size: 4, count: 2 },
+      { size: 4, count: 1 },
       { size: 3, count: 2 },
       { size: 2, count: 2 },
     ],
@@ -195,6 +197,11 @@ export interface PingMessage {
   payload: Record<string, never>;
 }
 
+export interface StartSoloMessage {
+  type: MessageType.START_SOLO;
+  payload: { difficulty: Difficulty };
+}
+
 export type ClientMessage =
   | CreateRoomMessage
   | JoinRoomMessage
@@ -202,7 +209,8 @@ export type ClientMessage =
   | LeaveQueueMessage
   | PlaceShipsMessage
   | AttackMessage
-  | PingMessage;
+  | PingMessage
+  | StartSoloMessage;
 
 // ─── WebSocket messages: Server → Client ──────────────────────────────────────
 

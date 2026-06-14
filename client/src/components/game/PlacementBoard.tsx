@@ -8,6 +8,7 @@ import {
   allShipsPlaced,
   toPlacedShipInputs,
   buildInitialFleet,
+  randomizeFleet,
 } from '../../utils/board';
 import { Board } from './Board';
 import { Button } from '../ui/Button';
@@ -186,6 +187,16 @@ export function PlacementBoard({ difficulty, onConfirm, loading = false }: Place
             Rotate (R)
           </Button>
         )}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setShips(randomizeFleet(difficulty));
+            setSelectedId(null);
+          }}
+        >
+          Random
+        </Button>
         <Button
           variant="secondary"
           size="sm"

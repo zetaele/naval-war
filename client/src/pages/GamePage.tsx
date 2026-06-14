@@ -8,6 +8,7 @@ import { Board } from '../components/game/Board';
 import { PlacementBoard } from '../components/game/PlacementBoard';
 import { Button } from '../components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { playMiss, playHit, playSunk } from '../utils/sounds';
 
 export function GamePage() {
   const { user, accessToken } = useAuth();
@@ -27,13 +28,22 @@ export function GamePage() {
     if (!user) navigate('/auth', { replace: true });
   }, [user, navigate]);
 
-  // Track sunk animation
+  // Track sunk animation + play sounds
   useEffect(() => {
     const attack = state.lastAttack;
-    if (attack?.result === 'SUNK' && attack.sunkShipCells) {
-      setSunkAnimation(attack.sunkShipCells);
-      if (sunkTimerRef.current) clearTimeout(sunkTimerRef.current);
-      sunkTimerRef.current = setTimeout(() => setSunkAnimation([]), 2000);
+    if (!attack) return;
+
+    if (attack.result === 'SUNK') {
+      playSunk();
+      if (attack.sunkShipCells) {
+        setSunkAnimation(attack.sunkShipCells);
+        if (sunkTimerRef.current) clearTimeout(sunkTimerRef.current);
+        sunkTimerRef.current = setTimeout(() => setSunkAnimation([]), 2000);
+      }
+    } else if (attack.result === 'HIT') {
+      playHit();
+    } else {
+      playMiss();
     }
   }, [state.lastAttack]);
 

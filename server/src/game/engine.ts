@@ -12,6 +12,7 @@ import { send } from '../ws/send';
 import { broadcastToRoom, getWsByUserId, cleanupRoom } from '../ws/rooms';
 import { validateAndBuildBoard, applyAttack, allShipsSunk, maskBoard } from './board';
 import { getDb } from '../db/client';
+import type { Room } from '../ws/types';
 
 export function handlePlaceShips(ws: WebSocket, ships: PlacedShipInput[]): void {
   const client = clients.get(ws);
@@ -68,6 +69,11 @@ export function handlePlaceShips(ws: WebSocket, ships: PlacedShipInput[]): void 
     // Send each player their initial game state
     sendGameState(room, room.hostId);
     sendGameState(room, room.guestId);
+
+    // If the bot goes first, kick off its first attack
+    if (room.botUserId && firstTurnId === room.botUserId) {
+      scheduleBotAttack(room, room.botUserId, room.hostId);
+    }
   }
 }
 
@@ -118,8 +124,9 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
       : 0;
 
     const winnerUsername = client.username;
-    const loserWs = getWsByUserId(opponentId);
-    const loserUsername = loserWs ? (clients.get(loserWs)?.username ?? 'Unknown') : 'Unknown';
+    const loserUsername = room.botUserId === opponentId
+      ? 'Bot'
+      : (() => { const w = getWsByUserId(opponentId); return w ? (clients.get(w)?.username ?? 'Unknown') : 'Unknown'; })();
 
     // Send final board state before game-over notification
     sendGameState(room, room.hostId);
@@ -137,7 +144,7 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
       },
     });
 
-    persistGame(room, client.userId, opponentId, duration);
+    if (!room.botUserId) persistGame(room, client.userId, opponentId, duration);
     cleanupRoom(room.id);
     return;
   }
@@ -152,6 +159,87 @@ export function handleAttack(ws: WebSocket, row: number, col: number): void {
     type: MessageType.TURN_CHANGE,
     payload: { currentTurnPlayerId: opponentId },
   });
+
+  // If opponent is the bot, schedule its random attack
+  if (room.botUserId && opponentId === room.botUserId) {
+    scheduleBotAttack(room, room.botUserId, client.userId);
+  }
+}
+
+function scheduleBotAttack(room: Room, botId: string, playerId: string): void {
+  setTimeout(() => {
+    const r = rooms.get(room.id);
+    if (!r || r.state !== RoomState.IN_PROGRESS) return;
+    if (r.currentTurnUserId !== botId) return;
+
+    const playerBoard = r.boards.get(playerId);
+    if (!playerBoard) return;
+
+    // Collect all un-attacked cells
+    const size = DIFFICULTY_CONFIGS[r.difficulty].boardSize;
+    const targets: { row: number; col: number }[] = [];
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        const cell = playerBoard.cells[row]?.[col];
+        if (cell === CellState.EMPTY || cell === CellState.SHIP) {
+          targets.push({ row, col });
+        }
+      }
+    }
+    if (targets.length === 0) return;
+
+    const target = targets[Math.floor(Math.random() * targets.length)]!;
+    const { result, sunkShip } = applyAttack(playerBoard.cells, playerBoard.ships, target.row, target.col);
+    r.moveCount += 1;
+
+    const playerWs = getWsByUserId(playerId);
+    if (!playerWs) return;
+
+    send(playerWs, {
+      type: MessageType.ATTACK_RESULT,
+      payload: {
+        attackerId: botId,
+        row: target.row,
+        col: target.col,
+        result,
+        sunkShipId: sunkShip?.id,
+        sunkShipCells: sunkShip?.cells,
+      },
+    });
+
+    if (allShipsSunk(playerBoard.ships)) {
+      r.state = RoomState.FINISHED;
+      const duration = r.startedAt ? Math.floor((Date.now() - r.startedAt.getTime()) / 1000) : 0;
+      sendGameState(r, playerId);
+      send(playerWs, {
+        type: MessageType.GAME_OVER,
+        payload: {
+          winnerId: botId,
+          winnerUsername: 'Bot',
+          loserId: playerId,
+          loserUsername: getClientUsername(playerId),
+          moveCount: r.moveCount,
+          durationSeconds: duration,
+        },
+      });
+      cleanupRoom(r.id);
+      return;
+    }
+
+    r.currentTurnUserId = playerId;
+    sendGameState(r, playerId);
+    send(playerWs, {
+      type: MessageType.TURN_CHANGE,
+      payload: { currentTurnPlayerId: playerId },
+    });
+  }, 600);
+}
+
+function getClientUsername(userId: string): string {
+  for (const client of clients.values()) {
+    if (client.userId === userId) return client.username;
+  }
+  return 'Unknown';
 }
 
 function sendGameState(

@@ -113,3 +113,48 @@ export function rotateShip(ship: PlacementShip, boardSize: number, placedShips: 
 
   return ship; // Can't rotate, keep as is
 }
+
+export function randomizeFleet(difficulty: Difficulty): PlacementShip[] {
+  const config = DIFFICULTY_CONFIGS[difficulty];
+  const boardSize = config.boardSize;
+  const placed: PlacementShip[] = [];
+
+  // Place largest ships first to avoid impossible situations
+  const specs = [...config.fleet].sort((a, b) => b.size - a.size);
+
+  for (const spec of specs) {
+    for (let i = 0; i < spec.count; i++) {
+      const ship = placeShipRandomly(uuidv4(), spec.size, boardSize, placed);
+      if (ship) placed.push(ship);
+    }
+  }
+
+  return placed;
+}
+
+function placeShipRandomly(
+  id: string,
+  size: number,
+  boardSize: number,
+  placedSoFar: PlacementShip[],
+): PlacementShip | null {
+  const orientations = [Orientation.HORIZONTAL, Orientation.VERTICAL];
+  // Shuffle attempts: up to boardSize² × 2 tries
+  const maxAttempts = boardSize * boardSize * 2;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const orientation = orientations[Math.floor(Math.random() * 2)] as Orientation;
+    const maxRow = orientation === Orientation.VERTICAL ? boardSize - size : boardSize - 1;
+    const maxCol = orientation === Orientation.HORIZONTAL ? boardSize - size : boardSize - 1;
+    const origin = {
+      row: Math.floor(Math.random() * (maxRow + 1)),
+      col: Math.floor(Math.random() * (maxCol + 1)),
+    };
+
+    if (isValidPlacement(origin, size, orientation, boardSize, placedSoFar)) {
+      return { id, size, orientation, origin };
+    }
+  }
+
+  return null; // extremely unlikely with valid fleet configs
+}

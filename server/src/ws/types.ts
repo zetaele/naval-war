@@ -15,6 +15,7 @@ export interface Room {
   state: RoomState;
   hostId: string;
   guestId: string | null;
+  botUserId: string | null;
   boards: Map<string, PlayerBoard>;
   currentTurnUserId: string | null;
   moveCount: number;

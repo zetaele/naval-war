@@ -2,7 +2,7 @@ import type WebSocket from 'ws';
 import { MessageType, type ClientMessage } from '@naval-war/types';
 import { clients } from './state';
 import { send } from './send';
-import { createRoom, joinRoom, joinQueue, leaveQueue } from './rooms';
+import { createRoom, joinRoom, joinQueue, leaveQueue, startSoloGame } from './rooms';
 import { handlePlaceShips, handleAttack } from '../game/engine';
 
 export function handleMessage(ws: WebSocket, raw: string): void {
@@ -35,6 +35,10 @@ export function handleMessage(ws: WebSocket, raw: string): void {
 
     case MessageType.LEAVE_QUEUE:
       leaveQueue(ws);
+      break;
+
+    case MessageType.START_SOLO:
+      startSoloGame(ws, msg.payload.difficulty);
       break;
 
     case MessageType.PLACE_SHIPS:

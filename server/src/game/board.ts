@@ -150,6 +150,56 @@ export function applyAttack(
   return { result: 'MISS' };
 }
 
+export function generateBotBoard(difficulty: Difficulty): { ships: Ship[]; cells: CellState[][] } {
+  const config = DIFFICULTY_CONFIGS[difficulty];
+  const size = config.boardSize;
+  const cells: CellState[][] = Array.from({ length: size }, () =>
+    Array(size).fill(CellState.EMPTY) as CellState[],
+  );
+  const ships: Ship[] = [];
+
+  const specs = [...config.fleet].sort((a, b) => b.size - a.size);
+  for (const spec of specs) {
+    for (let i = 0; i < spec.count; i++) {
+      const result = placeShipOnGrid(uuidv4(), spec.size, size, cells);
+      if (result) ships.push(result);
+    }
+  }
+
+  return { ships, cells };
+}
+
+function placeShipOnGrid(id: string, size: number, boardSize: number, cells: CellState[][]): Ship | null {
+  const maxAttempts = boardSize * boardSize * 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const vertical = Math.random() < 0.5;
+    const maxRow = vertical ? boardSize - size : boardSize - 1;
+    const maxCol = vertical ? boardSize - 1 : boardSize - size;
+    const originRow = Math.floor(Math.random() * (maxRow + 1));
+    const originCol = Math.floor(Math.random() * (maxCol + 1));
+
+    const shipCells: Coordinate[] = [];
+    let valid = true;
+    for (let i = 0; i < size; i++) {
+      const r = vertical ? originRow + i : originRow;
+      const c = vertical ? originCol : originCol + i;
+      const row = cells[r];
+      if (!row || row[c] !== CellState.EMPTY) { valid = false; break; }
+      shipCells.push({ row: r, col: c });
+    }
+
+    if (valid) {
+      const orientation = vertical ? Orientation.VERTICAL : Orientation.HORIZONTAL;
+      for (const c of shipCells) {
+        const row = cells[c.row];
+        if (row) row[c.col] = CellState.SHIP;
+      }
+      return { id, size, orientation, cells: shipCells, hits: 0, sunk: false };
+    }
+  }
+  return null;
+}
+
 export function allShipsSunk(ships: Ship[]): boolean {
   return ships.length > 0 && ships.every((s) => s.sunk);
 }
